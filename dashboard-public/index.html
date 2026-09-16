@@ -1429,6 +1429,7 @@
       .td-info {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 6px;
         padding: 8px 16px;
         border-bottom: 1px solid var(--clr-border);
@@ -1439,6 +1440,55 @@
         transition:
           background var(--transition),
           border-color var(--transition);
+      }
+
+      .td-env-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        cursor: pointer;
+        user-select: none;
+      }
+      .td-env-wrap input[type="checkbox"] {
+        display: none;
+      }
+      .td-env-slider {
+        width: 30px;
+        height: 16px;
+        background: var(--clr-border-drk);
+        border-radius: 8px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .td-env-slider::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #fff;
+        transition: left 0.2s;
+      }
+      #td-environment:checked ~ .td-env-slider {
+        background: var(--clr-accent);
+      }
+      #td-environment:checked ~ .td-env-slider::after {
+        left: 16px;
+      }
+      .td-env-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--clr-accent);
+        letter-spacing: 0.05em;
+      }
+      .td-env-arrow {
+        font-size: 10px;
+        color: var(--clr-accent);
       }
 
       .td-body {
@@ -1816,6 +1866,8 @@
           placeholder="DD-MM-YYYY"
           style="display: none"
           autocomplete="off"
+          inputmode="numeric"
+          maxlength="10"
         />
         <input
           id="pin-input"
@@ -2134,7 +2186,13 @@
         <!-- Test Data panel -->
         <div id="testdata-panel">
           <div class="td-info">
-            ℹ️ Leave any field empty to use its default value from test-data.ts
+            <span>ℹ️ Leave any field empty to use its default value from test-data.ts</span>
+            <label class="td-env-wrap" title="Which Healthya environment to run tests against">
+              <input type="checkbox" id="td-environment" />
+              <span class="td-env-slider"></span>
+              <span class="td-env-label" id="td-env-current-label">DEV</span>
+              <span class="td-env-arrow">▾</span>
+            </label>
           </div>
           <div class="td-body">
             <!-- User Info -->
@@ -2428,6 +2486,45 @@
     </div>
 
     <script>
+      // ── Environment (Dev/Staging) toggle ────────────────────────────────────────
+      const ENVIRONMENT_BASE_URLS = {
+        dev: "https://dev.healthya.co.uk/",
+        staging: "https://staging.healthya.co.uk/",
+      };
+      const envToggle = document.getElementById("td-environment");
+      const envCurrentLabel = document.getElementById("td-env-current-label");
+      function updateEnvLabel() {
+        if (envCurrentLabel) {
+          envCurrentLabel.textContent = envToggle?.checked ? "STAGING" : "DEV";
+        }
+      }
+      if (envToggle) {
+        envToggle.checked = (localStorage.getItem("pw-env") || "dev") === "staging";
+        updateEnvLabel();
+        envToggle.addEventListener("change", () => {
+          localStorage.setItem("pw-env", envToggle.checked ? "staging" : "dev");
+          updateEnvLabel();
+        });
+      }
+      function getSelectedEnvironmentBaseURL() {
+        const key = envToggle && envToggle.checked ? "staging" : "dev";
+        return ENVIRONMENT_BASE_URLS[key] || ENVIRONMENT_BASE_URLS.dev;
+      }
+      // Rewrites a pasted/resolved patient_flow URL's host to the selected
+      // environment so navigation (not just BASE_URL) actually hits Dev/Staging.
+      function applyEnvironmentHost(urlStr) {
+        if (!urlStr) return urlStr;
+        try {
+          const target = new URL(getSelectedEnvironmentBaseURL());
+          const u = new URL(urlStr);
+          u.protocol = target.protocol;
+          u.host = target.host;
+          return u.toString();
+        } catch (_) {
+          return urlStr;
+        }
+      }
+
       // ── Theme toggle ──────────────────────────────────────────────────────────
       const themeBtn = document.getElementById("theme-toggle");
       const savedTheme = localStorage.getItem("pw-theme") || "dark";
@@ -2543,7 +2640,19 @@
         updateClearButton();
         updateAddLinkState();
       });
-      dobInput.addEventListener("input", updateAddLinkState);
+      // Auto-format DOB as DD-MM-YYYY while typing (digits only, dashes auto-inserted).
+      function formatDobInput(raw) {
+        const digits = raw.replace(/\D/g, "").slice(0, 8);
+        const day = digits.slice(0, 2);
+        const month = digits.slice(2, 4);
+        const year = digits.slice(4, 8);
+        return [day, month, year].filter(Boolean).join("-");
+      }
+      dobInput.addEventListener("input", () => {
+        const formatted = formatDobInput(dobInput.value);
+        if (formatted !== dobInput.value) dobInput.value = formatted;
+        updateAddLinkState();
+      });
       pinInput.addEventListener("input", updateAddLinkState);
 
       btnClearLink.addEventListener("click", () => {
@@ -4462,6 +4571,14 @@
             browserUrl.value = resolved.resolved;
           }
         }
+        // Selected Dev/Staging environment always wins — rewrite both the
+        // base URL and the actual navigation URL's host to match it.
+        customBaseURL = getSelectedEnvironmentBaseURL();
+        if (resolvedCustomURL) {
+          resolvedCustomURL = applyEnvironmentHost(resolvedCustomURL);
+          customLinkInput.value = resolvedCustomURL;
+          browserUrl.value = resolvedCustomURL;
+        }
 
         const runJourney = journey || activeJourneyFilter;
         if (!file && !grep && !line) {
@@ -4612,6 +4729,13 @@
             });
             resetJourneyFlowUI();
           }
+        }
+        // Selected Dev/Staging environment always wins — rewrite both the
+        // base URL and the actual navigation URL's host to match it.
+        finalBaseURL = getSelectedEnvironmentBaseURL();
+        if (finalStartUrl) {
+          finalStartUrl = applyEnvironmentHost(finalStartUrl);
+          customLinkInput.value = finalStartUrl;
         }
 
         setStatus("running", `Running: ${label}`);

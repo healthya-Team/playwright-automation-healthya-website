@@ -2499,10 +2499,9 @@
         }
       }
       if (envToggle) {
-        envToggle.checked = (localStorage.getItem("pw-env") || "dev") === "staging";
+        envToggle.checked = false; // ponytail: always default to Dev on load, don't persist Staging across reloads
         updateEnvLabel();
         envToggle.addEventListener("change", () => {
-          localStorage.setItem("pw-env", envToggle.checked ? "staging" : "dev");
           updateEnvLabel();
         });
       }

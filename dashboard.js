@@ -52,6 +52,31 @@ if (traceViewerPath) {
 
 const TEST_DATA_PATH = path.join(__dirname, "tests/fixtures/test-data.ts");
 const PHARMACIES_PATH = path.join(__dirname, "tests/fixtures/pharmacies.ts");
+const OUTCOME_CONFIG_PATH = path.join(
+  __dirname,
+  "tests/fixtures/outcome-config.ts",
+);
+
+// Regex-read (like test-data.ts) so outcome-config.ts stays the single source.
+// Only slug + outcome id/label/userType are needed — the run itself evaluates detectPatterns.
+function readConditionOutcomes() {
+  const src = fs
+    .readFileSync(OUTCOME_CONFIG_PATH, "utf8")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const list = src.slice(src.indexOf("export const CONDITION_OUTCOMES"));
+  return list
+    .split(/\bslug:\s*/)
+    .slice(1)
+    .map((chunk) => ({
+      slug: (chunk.match(/^"([^"]+)"/) || [])[1],
+      outcomes: [
+        ...chunk.matchAll(
+          /id:\s*"([^"]+)",\s*label:\s*"([^"]+)",\s*userType:\s*"([^"]+)"/g,
+        ),
+      ].map((m) => ({ id: m[1], label: m[2], userType: m[3] })),
+    }))
+    .filter((c) => c.slug && c.outcomes.length);
+}
 
 // ── Pharmacy + test discovery ─────────────────────────────────────────────────
 
@@ -911,6 +936,14 @@ app.get("/api/flow-configs", (_req, res) => {
   res.json(FLOW_CONFIGS);
 });
 
+app.get("/api/condition-outcomes", (_req, res) => {
+  try {
+    res.json(readConditionOutcomes());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/pharmacies", (_req, res) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
   try {
@@ -1123,6 +1156,10 @@ app.get("/api/run-tests", (req, res) => {
     typeof req.query.baseURL === "string" ? req.query.baseURL.trim() : "";
   const startUrl =
     typeof req.query.startUrl === "string" ? req.query.startUrl.trim() : "";
+  const outcome =
+    typeof req.query.outcome === "string" ? req.query.outcome.trim() : "";
+  const conditionSlug =
+    typeof req.query.slug === "string" ? req.query.slug.trim() : "";
   const grepArg = grep
     ? grep
         .split(" > ")
@@ -1133,6 +1170,7 @@ app.get("/api/run-tests", (req, res) => {
   if (project) parts.push(project);
   if (baseURL) parts.push(baseURL);
   if (startUrl) parts.push("patient_flow");
+  if (outcome) parts.push(`outcome: ${outcome}`);
   parts.push(
     label || (file ? `${file}${line ? ":" + line : ""}` : "all tests"),
   );
@@ -1232,6 +1270,9 @@ app.get("/api/run-tests", (req, res) => {
       ...tdEnv,
       ...(baseURL ? { BASE_URL: baseURL } : {}),
       ...(startUrl ? { START_URL: startUrl } : {}),
+      ...(outcome ? { OUTCOME_ID: outcome, CONDITION_SLUG: conditionSlug } : {}),
+      // The dashboard renders the Q&A table itself; skip the spec's ASCII copy.
+      RUN_VIA_DASHBOARD: "1",
     },
     detached: true,
   });
@@ -1263,7 +1304,17 @@ app.get("/api/run-tests", (req, res) => {
     const text = chunk.toString();
     stdout += text;
     text.split("\n").forEach((line) => {
-      if (line.trim()) send("log", line);
+      if (!line.trim()) return;
+      // The tagged JSON line is for parsing only — sent as its own event
+      // (rendered as a real table client-side), not dumped as a JSON wall.
+      const qaMatch = line.match(/^📋 QA_COMPARISON: (.+)$/);
+      if (qaMatch) {
+        try {
+          send("qa_table", JSON.parse(qaMatch[1]));
+        } catch (_) {}
+        return;
+      }
+      send("log", line);
     });
   });
 
@@ -1297,6 +1348,22 @@ app.get("/api/run-tests", (req, res) => {
       const failed = (stdout.match(/\d+ failed/)?.[0] || "").trim();
       const skipped = (stdout.match(/\d+ skipped/)?.[0] || "").trim();
       const artifacts = findArtifactsInDir(runOutputDir);
+
+      // Outcome runs (OUTCOME_ID set): the verdict is "did the expected outcome
+      // screen appear". It's logged mid-run, so re-print it last where it
+      // survives Playwright's own error noise — same as strachan.
+      let outcomeResult = null;
+      const outcomeMatch = stdout.match(/🎯 OUTCOME_RESULT: (.+)/);
+      if (outcomeMatch) {
+        try {
+          outcomeResult = JSON.parse(outcomeMatch[1]);
+        } catch (_) {}
+        send(
+          "log",
+          `\n🎯 Outcome check — expected "${outcomeResult?.expected}", got "${outcomeResult?.actual}" — ${outcomeResult?.passed ? "✅ PASSED" : "❌ FAILED"}`,
+        );
+      }
+
       send("done", {
         code,
         passed,
@@ -1304,6 +1371,7 @@ app.get("/api/run-tests", (req, res) => {
         skipped,
         success: code === 0,
         artifacts,
+        outcomeResult,
       });
       res.end();
     }, 1500);

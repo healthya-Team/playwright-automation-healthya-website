@@ -231,6 +231,16 @@
         color: var(--clr-txt-dim);
         margin-top: 1px;
       }
+      .rc-outcome {
+        display: inline-block;
+        margin-top: 3px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--clr-hover);
+        color: var(--clr-accent);
+        font-size: 10px;
+        font-weight: 600;
+      }
 
       #btn-clear-link {
         position: absolute;
@@ -714,13 +724,21 @@
         opacity: 0.4;
       }
 
+      /* Functional test case list is hidden — runs are started from the link
+         queue; the Runs section takes the freed sidebar space instead. */
+      #tree-hdr,
+      #tree,
+      #rsz-tree-runs {
+        display: none !important;
+      }
+
       /* ── Runs section ────────────────────────────────────────────────────────── */
       #runs-section {
         border-top: 1px solid var(--clr-border);
-        flex-shrink: 0;
+        flex: 1 1 auto;
         display: none;
         flex-direction: column;
-        max-height: 240px;
+        max-height: none;
         min-height: 80px;
         transition: border-color var(--transition);
       }
@@ -1839,6 +1857,214 @@
           height: 160px;
         }
       }
+
+      /* Outcome-screen sub-list under a pending link (same pattern as strachan-pharmacy-test) */
+      .outcomes-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        padding: 3px 6px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--clr-accent);
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        align-self: flex-start;
+      }
+      .outcomes-toggle-btn:hover {
+        background: var(--clr-hover);
+      }
+      .outcomes-toggle-arrow {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 0.15s;
+      }
+      .outcomes-toggle-btn.open .outcomes-toggle-arrow {
+        transform: rotate(45deg);
+      }
+      .outcomes-children {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 4px 0 2px 14px;
+      }
+      /* author `display:flex` would otherwise beat the UA [hidden] rule */
+      .outcomes-children[hidden] {
+        display: none;
+      }
+      .outcome-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: var(--clr-hover);
+        font-size: 11px;
+      }
+      .outcome-label {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--clr-txt);
+        font-weight: 500;
+      }
+      .outcome-user-tag {
+        flex-shrink: 0;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--clr-accent);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        opacity: 0.75;
+      }
+      .outcome-run-btn {
+        flex-shrink: 0;
+        padding: 2px 7px;
+        border: 1px solid var(--clr-accent);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--clr-accent);
+        font-size: 10px;
+        cursor: pointer;
+      }
+      .outcome-run-btn:hover {
+        background: var(--clr-accent);
+        color: #fff;
+      }
+      .outcome-row-all {
+        background: transparent;
+        border: 1px dashed var(--clr-accent);
+      }
+      .outcome-row-all .outcome-label {
+        color: var(--clr-accent);
+        font-weight: 700;
+      }
+      .outcome-run-all-btn {
+        background: var(--clr-accent);
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* Questionnaire Q&A verification table (Output panel) */
+      .qa-table-wrap {
+        margin: 10px 0;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        border: 1px solid var(--clr-border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--clr-surface);
+      }
+      .qa-table-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        padding: 10px 14px;
+        background: var(--clr-hover);
+        border-bottom: 1px solid var(--clr-border);
+        font-size: 12px;
+      }
+      .qa-table-title {
+        font-weight: 700;
+        color: var(--clr-txt);
+      }
+      .qa-table-stat {
+        color: var(--clr-txt-muted);
+      }
+      .qa-table-stat b {
+        color: var(--clr-txt);
+      }
+      .qa-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .qa-table th {
+        text-align: left;
+        padding: 8px 10px;
+        background: var(--clr-hover);
+        color: var(--clr-txt-muted);
+        font-weight: 600;
+        border-bottom: 1px solid var(--clr-border);
+        white-space: nowrap;
+      }
+      .qa-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--clr-border);
+        color: var(--clr-txt);
+        vertical-align: top;
+      }
+      /* Fixed layout + wrapping: long question text and answers stay readable
+         instead of being cut off at one line. */
+      .qa-table {
+        table-layout: fixed;
+      }
+      .qa-table th:nth-child(1),
+      .qa-table td:nth-child(1) {
+        width: 44px;
+      }
+      .qa-table th:nth-child(5),
+      .qa-table td:nth-child(5) {
+        width: 118px;
+      }
+      .qa-table td {
+        word-break: break-word;
+        line-height: 1.45;
+      }
+      .qa-table .qa-clamp {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .qa-table tr:last-child td {
+        border-bottom: none;
+      }
+      .qa-row-mismatch {
+        background: rgba(255, 90, 90, 0.08);
+      }
+      .qa-row-mismatch td:first-child {
+        box-shadow: inset 3px 0 0 var(--clr-fail);
+      }
+      .qa-row-match td:first-child {
+        box-shadow: inset 3px 0 0 var(--clr-pass);
+      }
+      .qa-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+      }
+      .qa-pill-match {
+        color: var(--clr-pass);
+        background: rgba(16, 217, 138, 0.14);
+      }
+      .qa-pill-mismatch {
+        color: var(--clr-fail);
+        background: rgba(245, 88, 90, 0.16);
+      }
+      .qa-pill-unverified {
+        color: var(--clr-txt-muted);
+        background: var(--clr-hover);
+        font-style: italic;
+      }
+      .qa-verdict {
+        margin-left: auto;
+      }
     </style>
   </head>
   <body>
@@ -2552,6 +2778,24 @@
       let conditionMatchedGroups = []; // [{ key, label, hints, tests[] }]
       let pharmacyExternalCasesCache = null;
 
+      // Conditions with outcome-screen testing (tests/fixtures/outcome-config.ts).
+      let conditionOutcomes = [];
+      fetch("/api/condition-outcomes")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list) => {
+          conditionOutcomes = Array.isArray(list) ? list : [];
+          renderLinkQueue();
+        })
+        .catch(() => {});
+
+      // Same slug shape run-flow.ts derives: "Shingles (Herpes Zoster)" + NHS → "shingles-herpes-zoster-nhs".
+      function outcomeConfigForEntry(entry) {
+        if (entry.loading || entry.flowMode === "logged-in" || !entry.conditionName) return null;
+        const base = entry.conditionName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        const slug = entry.tag ? `${base}-${entry.tag.toLowerCase()}` : base;
+        return conditionOutcomes.find((c) => slug.includes(c.slug) || c.slug.includes(slug)) || null;
+      }
+
       async function fetchPageMeta(url) {
         try {
           const r = await fetch(`/api/page-meta?url=${encodeURIComponent(url)}`);
@@ -2606,6 +2850,33 @@
 
       function updateClearButton() {
         btnClearLink.style.display = customLinkInput.value ? "flex" : "none";
+      }
+      // Runs write the resolved URL into this input from code, which never fires
+      // an "input" event — so the × button stayed hidden. Route every write
+      // through the same refresh instead of remembering it at each call site.
+      {
+        const nativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+        Object.defineProperty(customLinkInput, "value", {
+          configurable: true,
+          get() {
+            return nativeValue.get.call(this);
+          },
+          set(v) {
+            nativeValue.set.call(this, v);
+            updateClearButton();
+          },
+        });
+      }
+      // A run puts its URL in the input only to drive the browser bar. Once the
+      // run is over that is stale, so clear it — unless the user has since typed
+      // or pasted something else.
+      function clearRunInputUrl(runId) {
+        const url = runs.get(runId)?.inputUrl;
+        if (url && customLinkInput.value === url) {
+          customLinkInput.value = "";
+          healthyaAnalysis = null;
+          updateAddLinkState();
+        }
       }
 
       function updateAddLinkState() {
@@ -2722,13 +2993,83 @@
           const dobPinHtml = entry.flowMode === "logged-in" && entry.dob
             ? `<span style="font-size:9px;color:var(--clr-txt-dim)">DOB: ${entry.dob} · PIN: ${entry.pin}</span>`
             : "";
+          const outcomeCfg = outcomeConfigForEntry(entry);
+          const outcomeHtml = outcomeCfg
+            ? `<button class="outcomes-toggle-btn${entry.outcomesOpen ? " open" : ""}" title="Run this link towards a specific outcome screen">
+                <span class="outcomes-toggle-arrow"></span>Outcome screens (${outcomeCfg.outcomes.length})
+              </button>
+              <div class="outcomes-children"${entry.outcomesOpen ? "" : " hidden"}>
+                ${outcomeCfg.outcomes.length > 1 ? `
+                  <div class="outcome-row outcome-row-all">
+                    <span class="outcome-label">All ${outcomeCfg.outcomes.length} outcome screens</span>
+                    <button class="outcome-run-btn outcome-run-all-btn" title="Run every outcome screen for this condition, one after another">▶ Run all</button>
+                  </div>` : ""}
+                ${outcomeCfg.outcomes.map((o) => `
+                  <div class="outcome-row">
+                    <span class="outcome-label" title="${o.label}">${o.label}</span>
+                    ${o.userType ? `<span class="outcome-user-tag">${o.userType === "pds" ? "PDS" : "Non-PDS"}</span>` : ""}
+                    <button class="outcome-run-btn" data-outcome-id="${o.id}" title="Run and verify this outcome">▶</button>
+                  </div>`).join("")}
+              </div>`
+            : "";
           div.innerHTML = `
             <div style="display:flex;align-items:center;gap:5px;overflow:hidden;">
               <span style="flex-shrink:0;color:var(--clr-txt-dim)">${idx + 1}.</span>
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${entry.url}">${label}</span>
               ${tagHtml}
+              <button class="outcome-run-btn pl-run-btn" title="Run this link — normal questionnaire flow"${entry.loading ? " disabled" : ""}>▶</button>
             </div>
-            ${dobPinHtml}`;
+            ${dobPinHtml}
+            ${outcomeHtml}`;
+          // Normal (no outcome) run of just this link. Like the outcome ▶ buttons,
+          // the link stays queued so it can still be run again or per outcome.
+          div.querySelector(".pl-run-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (!isHealthyaSelected()) {
+              alert("Select healthya pharmacy first.");
+              return;
+            }
+            const runId = queueLinkRun(entry);
+            updateQueuePositions();
+            updateGlobalStatus();
+            processQueue();
+            selectRun(runId);
+          });
+          if (outcomeCfg) {
+            const toggle = div.querySelector(".outcomes-toggle-btn");
+            const children = div.querySelector(".outcomes-children");
+            toggle.addEventListener("click", () => {
+              entry.outcomesOpen = children.hasAttribute("hidden");
+              toggle.classList.toggle("open", entry.outcomesOpen);
+              children.toggleAttribute("hidden", !entry.outcomesOpen);
+            });
+            // The link stays queued so other outcomes can be run from it too.
+            // Runs go through the shared run queue, so several execute one after
+            // another (pass or fail) rather than in parallel.
+            const runOutcomes = (outcomes) => {
+              if (!isHealthyaSelected()) {
+                alert("Select healthya pharmacy first.");
+                return;
+              }
+              const runIds = outcomes.map((o) =>
+                queueLinkRun(entry, { ...o, slug: outcomeCfg.slug }),
+              );
+              updateQueuePositions();
+              updateGlobalStatus();
+              processQueue();
+              selectRun(runIds[0]);
+            };
+            div.querySelectorAll(".outcome-run-btn[data-outcome-id]").forEach((btn) => {
+              btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                runOutcomes(outcomeCfg.outcomes.filter((o) => o.id === btn.dataset.outcomeId));
+              });
+            });
+            div.querySelector(".outcome-run-all-btn")?.addEventListener("click", (e) => {
+              e.stopPropagation();
+              runOutcomes(outcomeCfg.outcomes);
+            });
+          }
           linkQueueList.appendChild(div);
         });
         linkQueueHdr.textContent = `Pending Links (${queuedLinks.length})`;
@@ -2871,6 +3212,62 @@
         renderLinkQueue();
       });
 
+      // Adds one pending link to the run queue (caller kicks processQueue).
+      // `outcome` ({ id, label, slug }) makes it an outcome-screen run.
+      function queueLinkRun(entry, outcome = null) {
+        const url = entry.url;
+        const conditionName = entry.conditionName;
+        const isLoggedIn = entry.flowMode === "logged-in";
+        const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const baseLabel = conditionName || `Batch: ${url.split("/").pop().substring(0, 10)}...`;
+        const runLabel = outcome ? `${baseLabel} — ${outcome.label}` : baseLabel;
+
+        const baseOverrides = tdCollectForm();
+        if (isLoggedIn) {
+          baseOverrides.user.dobDay = entry.dobDay;
+          baseOverrides.user.dobMonth = entry.dobMonth;
+          baseOverrides.user.dobYear = entry.dobYear;
+          baseOverrides.user.pin = entry.pin;
+        }
+        const tdOverrides = btoa(JSON.stringify(baseOverrides));
+
+        runs.set(runId, {
+          label: runLabel,
+          conditionName,
+          tag: entry.tag,
+          outcomeId: outcome?.id || null,
+          outcomeLabel: outcome?.label || null,
+          conditionSlug: outcome?.slug || null,
+          rawUrl: url,
+          dob: entry.dob || null,
+          pin: entry.pin || null,
+          flowMode: entry.flowMode || "non-logged",
+          status: "queued",
+          logs: [],
+          artifacts: null,
+          videoUrls: [],
+          startTime: null,
+          es: null,
+          elapsedTimer: null,
+          counts: null,
+          queueKey: null,
+          journey: "lifestyle",
+        });
+
+        runQueue.push({
+          runId,
+          file: isLoggedIn
+            ? "tests/e2e/pasted-link-loggedin-flow.spec.ts"
+            : "tests/e2e/pasted-link-flow.spec.ts",
+          label: runLabel,
+          rawLink: url,
+          tdOverrides,
+        });
+
+        addRunCard(runId);
+        return runId;
+      }
+
       btnRunQueuedLinks.addEventListener("click", async () => {
         if (queuedLinks.length === 0) return;
         if (!isHealthyaSelected()) {
@@ -2884,53 +3281,7 @@
 
         let firstRunId = null;
         for (const entry of linksToRun) {
-          const url = entry.url;
-          const conditionName = entry.conditionName;
-          const tag = entry.tag;
-          const isLoggedIn = entry.flowMode === "logged-in";
-          const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-          const runLabel = conditionName || `Batch: ${url.split("/").pop().substring(0, 10)}...`;
-
-          const baseOverrides = tdCollectForm();
-          if (isLoggedIn) {
-            baseOverrides.user.dobDay = entry.dobDay;
-            baseOverrides.user.dobMonth = entry.dobMonth;
-            baseOverrides.user.dobYear = entry.dobYear;
-            baseOverrides.user.pin = entry.pin;
-          }
-          const tdOverrides = btoa(JSON.stringify(baseOverrides));
-
-          runs.set(runId, {
-            label: runLabel,
-            conditionName,
-            tag,
-            rawUrl: url,
-            dob: entry.dob || null,
-            pin: entry.pin || null,
-            flowMode: entry.flowMode || "non-logged",
-            status: "queued",
-            logs: [],
-            artifacts: null,
-            videoUrls: [],
-            startTime: null,
-            es: null,
-            elapsedTimer: null,
-            counts: null,
-            queueKey: null,
-            journey: "lifestyle",
-          });
-
-          runQueue.push({
-            runId,
-            file: isLoggedIn
-              ? "tests/e2e/pasted-link-loggedin-flow.spec.ts"
-              : "tests/e2e/pasted-link-flow.spec.ts",
-            label: runLabel,
-            rawLink: url,
-            tdOverrides,
-          });
-
-          addRunCard(runId);
+          const runId = queueLinkRun(entry);
           if (!firstRunId) firstRunId = runId;
         }
         updateQueuePositions();
@@ -3797,6 +4148,75 @@
       function clearLog() {
         logEl.innerHTML = "";
       }
+
+      // Questionnaire filled-vs-submitted comparison, rendered as a real table
+      // in the Output panel instead of a wall of JSON text.
+      function buildQaTableElement(comparison) {
+        const esc = (s) =>
+          (s ?? "").toString().replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+        const hasServerData = comparison.totalSubmitted > 0;
+        const mismatchCount = hasServerData ? comparison.totalSubmitted - comparison.matchedCount : 0;
+        const verdict = !hasServerData
+          ? '<span class="qa-pill qa-pill-unverified qa-verdict">ℹ️ UNVERIFIED</span>'
+          : mismatchCount === 0
+            ? '<span class="qa-pill qa-pill-match qa-verdict">✅ ALL MATCH</span>'
+            : `<span class="qa-pill qa-pill-mismatch qa-verdict">❌ ${mismatchCount} MISMATCH${mismatchCount > 1 ? "ES" : ""}</span>`;
+        const wrap = document.createElement("div");
+        wrap.className = "qa-table-wrap";
+
+        const summary = document.createElement("div");
+        summary.className = "qa-table-summary";
+        summary.innerHTML = `
+          <span class="qa-table-title">📋 Questionnaire Answer Verification</span>
+          <span class="qa-table-stat">Filled: <b>${comparison.totalFilled}</b></span>
+          <span class="qa-table-stat">Submitted: <b>${hasServerData ? comparison.totalSubmitted : "N/A"}</b></span>
+          <span class="qa-table-stat">Matched: <b>${hasServerData ? `${comparison.matchedCount}/${comparison.totalSubmitted}` : "N/A"}</b></span>
+          ${hasServerData ? "" : '<span class="qa-table-stat" style="font-style:italic;">(submitted answers unavailable — request body could not be captured)</span>'}
+          ${verdict}`;
+        wrap.appendChild(summary);
+
+        const table = document.createElement("table");
+        table.className = "qa-table";
+        table.innerHTML = `
+          <thead>
+            <tr><th>#</th><th>Question</th><th>Filled Answer</th><th>Submitted Answer</th><th>Status</th></tr>
+          </thead>
+          <tbody></tbody>`;
+        const tbody = table.querySelector("tbody");
+        (comparison.rows || []).forEach((row, i) => {
+          const tr = document.createElement("tr");
+          tr.className = row.unverified ? "qa-row-unverified" : row.matched ? "qa-row-match" : "qa-row-mismatch";
+          const status = row.unverified
+            ? '<span class="qa-pill qa-pill-unverified">ℹ️ UNVERIFIED</span>'
+            : row.matched
+              ? '<span class="qa-pill qa-pill-match">✅ MATCH</span>'
+              : '<span class="qa-pill qa-pill-mismatch">❌ MISMATCH</span>';
+          tr.innerHTML = `
+            <td>Q${i + 1}</td>
+            <td class="qa-question" title="${esc(row.question)}"><div class="qa-clamp">${esc(row.question)}</div></td>
+            <td>${esc(row.filledAnswer ?? "(no match)")}</td>
+            <td>${row.submittedAnswer == null ? "(unavailable)" : esc(row.submittedAnswer)}</td>
+            <td>${status}</td>`;
+          tbody.appendChild(tr);
+        });
+        wrap.appendChild(table);
+        return wrap;
+      }
+      function appendLogEntry(entry) {
+        if (entry.table) {
+          logEl.appendChild(buildQaTableElement(entry.table));
+          logEl.scrollTop = logEl.scrollHeight;
+        } else {
+          appendLog(entry.text, entry.cls);
+        }
+      }
+      function addRunTable(runId, comparison) {
+        const run = runs.get(runId);
+        if (!run) return;
+        const entry = { table: comparison };
+        run.logs.push(entry);
+        if (selectedRunId === runId) appendLogEntry(entry);
+      }
       function parseApiLogLine(text) {
         const head = text.match(/^\[API\s+(\d+)\]\s+([A-Z]+)\s+(\d{3})\s+(https?:\/\/\S+)/);
         if (head) {
@@ -4241,9 +4661,12 @@
         const copyHtml = run.rawUrl
           ? `<button class="rc-copy-url" title="Copy URL">🔗</button>`
           : "";
-        const dobPinHtml = run.flowMode === "logged-in" && run.dob
+        const dobPinHtml = (run.flowMode === "logged-in" && run.dob
           ? `<div class="rc-dobpin">DOB: ${run.dob} · PIN: ${run.pin}</div>`
-          : "";
+          : "") +
+          (run.outcomeId
+            ? `<div class="rc-outcome" title="Outcome screen this run verifies">🎯 Outcome: ${run.outcomeLabel || run.outcomeId}</div>`
+            : "");
         card.innerHTML = `
         <span class="rc-dot ${run.status}"></span>
         <div class="rc-info">
@@ -4407,7 +4830,7 @@
           return;
         }
 
-        run.logs.forEach(({ text, cls }) => appendLog(text, cls));
+        run.logs.forEach(appendLogEntry);
         renderApiPanel();
 
         if (run.status === "running") {
@@ -4735,6 +5158,8 @@
         if (finalStartUrl) {
           finalStartUrl = applyEnvironmentHost(finalStartUrl);
           customLinkInput.value = finalStartUrl;
+          const runForInput = runs.get(runId);
+          if (runForInput) runForInput.inputUrl = finalStartUrl;
         }
 
         setStatus("running", `Running: ${label}`);
@@ -4752,6 +5177,11 @@
         if (finalBaseURL) params.set("baseURL", finalBaseURL);
         if (finalStartUrl) params.set("startUrl", finalStartUrl);
         if (finalStartUrl) browserUrl.value = finalStartUrl;
+        const outcomeRun = runs.get(runId);
+        if (outcomeRun?.outcomeId) {
+          params.set("outcome", outcomeRun.outcomeId);
+          params.set("slug", outcomeRun.conditionSlug || "");
+        }
 
         const es = new EventSource(`/api/run-tests?${params}`);
         const run = runs.get(runId);
@@ -4762,6 +5192,16 @@
           if (type === "start") {
             addRunLog(runId, data, "log-start");
           } else if (type === "log") {
+            // Normally the server turns this tagged line into a "qa_table"
+            // event; handling it here too means a dashboard server started
+            // before that change still renders the table, not raw JSON.
+            const qaLine = data.match(/^📋 QA_COMPARISON: (.+)$/);
+            if (qaLine) {
+              try {
+                addRunTable(runId, JSON.parse(qaLine[1]));
+                return;
+              } catch (_) {}
+            }
             const cls = classifyLog(data);
             addRunLog(runId, data, cls);
 
@@ -4779,10 +5219,13 @@
 
             const m = data.match(/https?:\/\/\S+/);
             if (m && selectedRunId === runId) browserUrl.value = m[0];
+          } else if (type === "qa_table") {
+            addRunTable(runId, data);
           } else if (type === "ping") {
             refreshLiveArtifacts();
           } else if (type === "done") {
             es.close();
+            clearRunInputUrl(runId);
             const r = runs.get(runId);
             if (!r) {
               queueRunning = false;
@@ -4835,6 +5278,7 @@
           const r = runs.get(runId);
           if (!r || r.status !== "running") return;
           es.close();
+          clearRunInputUrl(runId);
           r.es = null;
           r.status = "stopped";
           addRunLog(runId, "Connection to server lost.", "log-fail");
@@ -4887,6 +5331,7 @@
           run.es = null;
         }
         run.status = "stopped";
+        clearRunInputUrl(runId);
         addRunLog(runId, "Run stopped by user.", "log-warn");
         updateRunCard(runId);
         updateGlobalStatus();

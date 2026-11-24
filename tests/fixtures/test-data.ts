@@ -51,6 +51,64 @@ export const TEST_USER = {
   },
 };
 
+/**
+ * Identity that resolves to a real NHS/PDS record on the mock backend (same
+ * seed strachan-pharmacy-test uses). Identity fields are pinned literals, not
+ * spread from TEST_USER, so editing the dashboard Test Data (TD_*) can't
+ * silently break the match. Payment/password/etc. still follow TEST_USER.
+ */
+export const TEST_USER_PDS: typeof TEST_USER = {
+  ...TEST_USER,
+  gender: "male",
+  dob: {
+    day: "15",
+    month: "04",
+    year: "1962",
+    iso: "1962-04-15",
+    display: "15/04/1962",
+  },
+  firstName: "Lloyd",
+  lastName: "PEENEY",
+  postcode: "HD59LT",
+  genderValue: "male",
+  email: "lloyd.p2@yopmail.com",
+  phone: "447467059973",
+};
+
+/**
+ * Identity that does NOT resolve to an NHS/PDS record. It is TEST_USER, except
+ * when TD_* edits make its DOB equal the PDS seed's (the dashboard's NHS toggle
+ * can do that) — then the day is shifted so it can never match by accident.
+ */
+const _pdsDob = TEST_USER_PDS.dob;
+const _clashesWithPds =
+  Number(TEST_USER.dob.day) === Number(_pdsDob.day) &&
+  Number(TEST_USER.dob.month) === Number(_pdsDob.month) &&
+  TEST_USER.dob.year === _pdsDob.year;
+const _nonPdsDay = _clashesWithPds
+  ? String((Number(TEST_USER.dob.day) % 28) + 1).padStart(2, "0")
+  : TEST_USER.dob.day;
+
+export const TEST_USER_NON_PDS: typeof TEST_USER = {
+  ...TEST_USER,
+  dob: {
+    ...TEST_USER.dob,
+    day: _nonPdsDay,
+    iso: `${TEST_USER.dob.year}-${TEST_USER.dob.month.padStart(2, "0")}-${_nonPdsDay.padStart(2, "0")}`,
+    display: `${_nonPdsDay.padStart(2, "0")}/${TEST_USER.dob.month.padStart(2, "0")}/${TEST_USER.dob.year}`,
+  },
+};
+
+/**
+ * "fill-all": fill every question, required or not (default).
+ * "required-only": skip questions without the "*" required marker.
+ */
+export type QuestionnaireFillMode = "fill-all" | "required-only";
+
+export const QUESTIONNAIRE_FILL_MODE: QuestionnaireFillMode =
+  (process.env.QUESTIONNAIRE_FILL_MODE as QuestionnaireFillMode) ||
+  ("fill-all" as QuestionnaireFillMode);
+
 export type ConditionJourneyType = "nhs" | "private" | "lifestyle";
 
 export const CONDITION_CATALOG: Record<ConditionJourneyType, string> = {

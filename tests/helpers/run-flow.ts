@@ -2,12 +2,20 @@ import { Page, expect, test } from "@playwright/test";
 import { dismissCookieConsent } from "./cookie-consent";
 import {
   TEST_USER,
+  TEST_USER_PDS,
+  TEST_USER_NON_PDS,
   CART_PREFERENCES,
   DRUG_SELECTION_PREFERENCES,
   SHIPPING_ADDRESS_PREFERENCES,
   THANK_YOU_PREFERENCES,
 } from "../fixtures/test-data";
 import { FlowConfig } from "../fixtures/flow-configs";
+import { getOutcome, getOutcomeConfig } from "../fixtures/outcome-config";
+import {
+  captureQuestionnaireSubmissions,
+  logQaVerification,
+  type QuestionnaireSubmission,
+} from "./qa-verification";
 import { ConditionsPage } from "../page-objects/ConditionsPage";
 import { ConditionDetailPage } from "../page-objects/ConditionDetailPage";
 import { GuestContinuePage } from "../page-objects/GuestContinuePage";
@@ -98,6 +106,75 @@ function setupApiDebugLogging(page: Page): void {
       console.log(`[API] logger error: ${msg}`);
     }
   });
+}
+
+/** "Shingles (Herpes Zoster)" + NHS badge → "shingles-herpes-zoster-nhs" (Sanity conditionSlug shape). */
+function slugifyCondition(name: string, tag: "nhs" | "private" | ""): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return tag ? `${base}-${tag}` : base;
+}
+
+/**
+ * Condition slug for an outcome run: CONDITION_SLUG (sent by the dashboard,
+ * which reads it from the link up front) or, for CLI runs, the same
+ * #patient_header h5 + NHS/private badge the dashboard's /api/page-meta reads.
+ */
+async function detectConditionSlug(page: Page): Promise<string> {
+  if (process.env.CONDITION_SLUG) return process.env.CONDITION_SLUG;
+  const h5 = page.locator("#patient_header h5").first();
+  const name = await h5.textContent({ timeout: 8_000 }).catch(() => null);
+  if (!name?.trim()) return "";
+  const badge = await h5
+    .evaluate((el) => el.nextElementSibling?.tagName.toLowerCase() ?? "")
+    .catch(() => "");
+  return slugifyCondition(
+    name.trim(),
+    badge === "img" ? "nhs" : badge === "svg" ? "private" : "",
+  );
+}
+
+/**
+ * Outcome reached according to the submit_questionnaire responses (see
+ * OutcomeDefinition.apiMatch) — for outcomes the site shows no screen for.
+ */
+function detectOutcomeFromSubmissions(
+  slug: string,
+  submissions: QuestionnaireSubmission[],
+): { id: string; label: string } | null {
+  const config = getOutcomeConfig(slug);
+  if (!config) return null;
+  for (const { responseBody } of submissions) {
+    const reported = String(
+      (responseBody as any)?.data?.pre_consult_outcome ?? "",
+    ).toLowerCase();
+    if (!reported) continue;
+    const hit = config.outcomes.find(
+      (o) => o.apiMatch?.preConsultOutcome.toLowerCase() === reported,
+    );
+    if (hit) return { id: hit.id, label: hit.label };
+  }
+  return null;
+}
+
+/** Which configured outcome screen (outcome-config.ts) the page currently shows, if any. */
+async function detectOutcomeScreen(
+  page: Page,
+  slug: string,
+  skipIds: string[] = [],
+): Promise<{ id: string; label: string } | null> {
+  const config = getOutcomeConfig(slug);
+  if (!config) return null;
+  const text = await page
+    .locator("body")
+    .innerText()
+    .catch(() => "");
+  const hit = config.outcomes.find(
+    (o) => !skipIds.includes(o.id) && o.detectPatterns.some((p) => p.test(text)),
+  );
+  return hit ? { id: hit.id, label: hit.label } : null;
 }
 
 function detectQuestionnaireRulesKeyFromText(text: string): string | null {
@@ -541,6 +618,7 @@ export async function runConditionFlow(
   projectBaseURL?: string,
 ): Promise<void> {
   setupApiDebugLogging(page);
+  const questionnaireSubmissions = captureQuestionnaireSubmissions(page);
 
   const conditionsPage = new ConditionsPage(page);
   const detailPage = new ConditionDetailPage(page);
@@ -589,8 +667,12 @@ export async function runConditionFlow(
       booking,
       payment,
       landingPage,
+      questionnaireSubmissions,
     );
   } finally {
+    // In `finally` so the table still shows when the run fails (outcome
+    // mismatch, timeout) — that's when it's most useful.
+    logQaVerification(questionnaire.filledAnswers, questionnaireSubmissions);
     if (config.questionnaireRulesKey) {
       if (previousRulesOverride === undefined) {
         delete process.env.OVERRIDE_ACTIVE_CONDITION;
@@ -619,16 +701,21 @@ async function runConditionFlowImpl(
   booking: BookingPage,
   payment: PaymentPage,
   landingPage: LandingPage,
+  questionnaireSubmissions: QuestionnaireSubmission[],
 ): Promise<void> {
   const isLifestyle = config.conditionJourneyType === "lifestyle";
   const startUrl = process.env.START_URL?.trim();
   let runtimeRulesOverrideApplied = false;
+  const outcomeId = process.env.OUTCOME_ID?.trim() || "";
+  let outcomeSlug = outcomeId ? process.env.CONDITION_SLUG || "" : "";
 
   if (startUrl) {
     console.log(`✔ Direct patient flow start URL: ${startUrl}`);
     await gotoStartUrlWithRetry(page, startUrl);
     await dismissCookieConsent(page);
     await checkLinkExpired(page);
+    // The patient header is only guaranteed before Get Started is clicked.
+    if (outcomeId && !outcomeSlug) outcomeSlug = await detectConditionSlug(page);
     const landingDetected = await landingPage.isVisible();
     if (landingDetected) {
       const journey = await landingPage.detectJourneyFlow();
@@ -666,6 +753,27 @@ async function runConditionFlowImpl(
         );
       }
     }
+  }
+
+  if (outcomeId) {
+    const outcomeConfig = getOutcomeConfig(outcomeSlug);
+    const outcome = getOutcome(outcomeSlug, outcomeId);
+    if (!outcomeConfig || !outcome) {
+      throw new Error(
+        `Outcome "${outcomeId}" is not configured for condition "${outcomeSlug || "unknown"}" (tests/fixtures/outcome-config.ts)`,
+      );
+    }
+    // The slug selects OUTCOME_RULES[slug][OUTCOME_ID] in QuestionnairePage,
+    // so it must win over the text-detected "shingles"-style key.
+    process.env.OVERRIDE_ACTIVE_CONDITION = outcomeConfig.slug;
+    runtimeRulesOverrideApplied = true;
+    // Each outcome is only reachable for one signup identity: "pds" resolves to
+    // a real NHS record (radio questionnaire), "non_pds" doesn't (checkbox
+    // questionnaire). The outcome's own config picks it, as in strachan.
+    user = outcome.userType === "pds" ? TEST_USER_PDS : TEST_USER_NON_PDS;
+    console.log(
+      `🎯 Outcome run: ${outcomeConfig.slug} → ${outcomeId} (userType=${outcome.userType}, ${user.firstName} ${user.lastName}, dob ${user.dob.display})`,
+    );
   }
 
   // ── Step 1: Resolve condition href ────────────────────────────────────────
@@ -791,11 +899,20 @@ async function runConditionFlowImpl(
   const MAX_STEP_VISITS = 6;
   let flowCompleted = false;
   let endedByAssessment = false;
+  // Terminal outcome screens (Self Care, NHS 111, A&E...) are left via End
+  // assessment / Back to Home, so record them the moment they render.
+  // Gateway is only judged on the final page — its patterns are too broad
+  // to scan mid-journey.
+  let terminalOutcome: { id: string; label: string } | null = null;
+  let reachedPayment = false;
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     if (flowCompleted) break;
     await page.waitForTimeout(1500);
     await dismissCookieConsent(page);
+    if (outcomeId && !terminalOutcome) {
+      terminalOutcome = await detectOutcomeScreen(page, outcomeSlug, ["gateway"]);
+    }
 
     if (await handleTerminalBackToHomePopup(page)) {
       console.log(
@@ -958,6 +1075,22 @@ async function runConditionFlowImpl(
             );
             endedByAssessment = true;
             flowCompleted = true;
+          }
+          // An outcome with no on-screen result (apiMatch) can only be seen in
+          // the questionnaire response. Once that confirms the expected outcome
+          // there is nothing left to verify — stop here rather than carry on
+          // and book a real appointment.
+          if (outcomeId && outcomeId !== "gateway" && !flowCompleted) {
+            const fromApi = detectOutcomeFromSubmissions(
+              outcomeSlug,
+              questionnaireSubmissions,
+            );
+            if (fromApi?.id === outcomeId) {
+              console.log(
+                `✔ ${fromApi.label} confirmed by the questionnaire response (the site shows no result screen for it) — stopping`,
+              );
+              flowCompleted = true;
+            }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -1124,6 +1257,17 @@ async function runConditionFlowImpl(
       }
 
       case "payment": {
+        if (outcomeId) {
+          // Reaching the payment step IS the Gateway (booking) outcome — same
+          // as strachan, where the journey "ends on the payment step". Don't
+          // pay: an outcome check shouldn't create a booking / run 3-D Secure.
+          console.log(
+            "✔ Payment step reached — Booking (Gateway) outcome, not paying for an outcome run",
+          );
+          reachedPayment = true;
+          flowCompleted = true;
+          break;
+        }
         console.log("→ Handling payment step");
         await payment.completePayment(user.payment, config.paymentMethod);
         if (payment.isBookingFlowCompleted()) {
@@ -1136,6 +1280,61 @@ async function runConditionFlowImpl(
   }
 
   // ── Final assertion ───────────────────────────────────────────────────────
+  if (outcomeId) {
+    const expected = getOutcome(outcomeSlug, outcomeId)!;
+    // In order of confidence: a result screen captured while it was visible,
+    // then the questionnaire API's own verdict (outcomes with no screen), then
+    // reaching the payment step (= the Gateway/booking path), then a page scan.
+    // An "unknown" screen is only the last resort so it can't hide a real match.
+    const screenOutcome =
+      terminalOutcome ??
+      (questionnaire.reachedOutcome?.id !== "unknown"
+        ? questionnaire.reachedOutcome
+        : null);
+    const detected =
+      screenOutcome ??
+      detectOutcomeFromSubmissions(outcomeSlug, questionnaireSubmissions) ??
+      (reachedPayment
+        ? {
+            id: "gateway",
+            label:
+              getOutcome(outcomeSlug, "gateway")?.label ?? "Booking (Gateway)",
+          }
+        : await detectOutcomeScreen(page, outcomeSlug)) ??
+      questionnaire.reachedOutcome;
+    const actualLabel = detected?.label ?? "Unknown";
+    const passed = detected?.id === outcomeId;
+
+    console.log(
+      `🎯 OUTCOME_RESULT: ${JSON.stringify({
+        condition: outcomeSlug,
+        userType: expected.userType,
+        expected: expected.label,
+        actual: actualLabel,
+        passed,
+      })}`,
+    );
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("Outcome Test");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log(`Condition: ${outcomeSlug}`);
+    console.log(`User: ${expected.userType === "pds" ? "PDS" : "Non-PDS"}`);
+    console.log(`Expected Outcome: ${expected.label}`);
+    console.log(`Actual Outcome: ${actualLabel}`);
+    console.log(
+      passed
+        ? "✅ TEST PASSED"
+        : `❌ TEST FAILED — Expected ${expected.label} but ${actualLabel} was displayed.`,
+    );
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    expect(
+      passed,
+      `Expected outcome "${expected.label}" but detected "${actualLabel}"`,
+    ).toBe(true);
+    return;
+  }
+
   if (endedByAssessment) {
     console.log(
       "✔ Final assertion skipped: flow intentionally ended via End Assessment",
